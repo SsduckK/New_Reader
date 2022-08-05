@@ -1,4 +1,6 @@
-import numpy as np
+import os
+import os.path as op
+from glob import glob
 
 
 class DriveManagerBase:
@@ -8,15 +10,10 @@ class DriveManagerBase:
         self.drive_paths = self.list_drive_paths()
 
     def list_drive_paths(self):
-        drive_paths = []
-        valid_paths = []
-        for dpath in drive_paths:
-            if self.check_validity(dpath):
-                valid_paths.append(dpath)
-        return valid_paths
+        raise NotImplementedError()
 
     def check_validity(self, drive_path):
-        pass
+        raise NotImplementedError()
 
     def get_drive_paths(self):
         return self.drive_paths
@@ -32,10 +29,13 @@ class DatasetReaderBase:
         self.frame_names = self.init_drive(drive_path, split)
 
     def init_drive(self, drive_path, split):
-        pass
+        raise NotImplementedError()
 
     def __len__(self):
         return len(self.frame_names)
+
+    def get_images(self, index):
+        raise NotImplementedError()
 
     def get_box2d(self, index, sensor_id=None):
         pass
