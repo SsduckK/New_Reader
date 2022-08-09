@@ -25,7 +25,6 @@ class DriveManagerBase:
 class DatasetReaderBase:
     def __init__(self, drive_path, split, dataset_cfg):
         self.dataset_cfg = dataset_cfg
-        self.check_validity(drive_path)
         self.frame_names = self.init_drive(drive_path, split)
 
     def init_drive(self, drive_path, split):
@@ -37,7 +36,7 @@ class DatasetReaderBase:
     def get_images(self, index):
         raise NotImplementedError()
 
-    def get_box2d(self, index, sensor_id=None):
+    def get_box2d(self, index, raw_image_shape=None, sensor_id=None):
         pass
 
     def get_box3d(self, index, sensor_id=None, frame=None, style=None):
