@@ -33,27 +33,28 @@ class DatasetReaderBase:
     def __len__(self):
         return len(self.frame_names)
 
-    def get_images(self, index):
+    def get_images(self, index, sensor_id=None):
         raise NotImplementedError()
 
-    def get_box2d(self, index, raw_image_shape=None, sensor_id=None):
-        pass
+    def get_box2d(self, index, sensor_id=None):
+        raise NotImplementedError()
 
     def get_box3d(self, index, sensor_id=None, frame=None, style=None):
-        pass
+        raise NotImplementedError()
 
     def get_point_cloud(self, index, sensor_id=None, frame=None, style=None):
-        pass
+        raise NotImplementedError()
 
     def get_depth_map(self, index, sensor_id=None, frame=None):
-        pass
+        raise NotImplementedError()
 
     def get_intrinsic(self, sensor_id=None):
-        pass
+        raise NotImplementedError()
 
     def get_transform(self, src_frame, dst_frame, style=None):
-        pass
+        raise NotImplementedError()
 
     def get_transform_to_body(self, tgt_frame, style=None):
-        pass
+        raise NotImplementedError()
+
 
