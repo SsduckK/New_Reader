@@ -48,7 +48,7 @@ class DatasetReaderBase:
     def get_depth_map(self, index, sensor_id=None, frame=None):
         raise NotImplementedError()
 
-    def get_intrinsic(self, sensor_id=None):
+    def get_intrinsic(self, index, sensor_id=None):
         raise NotImplementedError()
 
     def get_transform(self, src_frame, dst_frame, style=None):

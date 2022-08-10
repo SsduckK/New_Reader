@@ -47,7 +47,8 @@ class KittiReader(DatasetReaderBase):
         self.cali_file = glob(op.join(drive_path[1], "*.txt"))
         self.label_file = glob(op.join(drive_path[3], "*.txt"))
         self.velo_file = glob(op.join(drive_path[4], "*.bin"))
-        self.drive_index = None
+        self.calib_data = None
+        self.file_index = None
 
     def init_drive(self, drive_path, split):
         """
@@ -60,7 +61,6 @@ class KittiReader(DatasetReaderBase):
         :return: [self.image_file]
         """
         self.image_file = glob(op.join(drive_path[2], "*.png"))
-        self.drive_index = len(self.image_file)
 
         self.image_file.sort()
         if split == "train":
@@ -78,7 +78,7 @@ class KittiReader(DatasetReaderBase):
 
     def get_images(self, index, sensor_id=None):
         """
-        :param index:
+        :param index: lists of file's index
         :param sensor_id: using when there is a multiple sensor
         :return: numpy image of self.frame_names[index]
         """
@@ -86,27 +86,65 @@ class KittiReader(DatasetReaderBase):
 
     def get_box2d(self, index, sensor_id=None):
         """
-
-        :param index:
+        :param index: lists of file's index
         :param sensor_id: using when there is a multiple sensor
         :return:
         """
-        self.image_file = self.frame_names[index]
+        image_file = self.frame_names[index]
+        label_file = self.label_file.copy()[index]
+        bboxes = []
+        categories = []
+
+        with open(label_file, 'r') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                bbox, category = self.extract_box(line)
+                if bbox is not None:
+                    bboxes.append(bbox)
+                    categories.append(category)
+        bboxes = np.array(bboxes)
+        return bboxes, categories
+
+    def extract_box(self, line):
+        raw_label = line.strip("\n").split(" ")
+        category_name = raw_label[0]
+        if category_name not in self.dataset_cfg.CATEGORIES_TO_USE:
+            return None, None
+        category_index = self.dataset_cfg.CATEGORIES_TO_USE.index(category_name)
+        if category_name in self.dataset_cfg.CATEGORY_REMAP:
+            category_name = self.dataset_cfg.CATEGORY_REMAP[category_name]
+        y1 = round(float(raw_label[5]))
+        x1 = round(float(raw_label[4]))
+        y2 = round(float(raw_label[7]))
+        x2 = round(float(raw_label[6]))
+        depth = depth_map[y1:y2, x1:x2]
+        dist_value = depth[np.where(depth > 0)]
+        if dist_value.size == 0:
+            dist_value = 0
+        else:
+            dist_value = np.quantile(dist_value, self.dataset_cfg.DIST_QUANTILE)
+        bbox = np.array([(y1 + y2) / 2, (x1 + x2) / 2, y2 - y1, x2 - x1, 1, dist_value], dtype=np.int32)
+        return bbox, category_name
 
     def get_box3d(self, index, sensor_id=None, frame=None, style=None):
-        pass
+        image_file = self.frame_names[index]
 
     def get_point_cloud(self, index, sensor_id=None, frame=None, style=None):
-        calib_data = self.load_calib_data(index, self.cali_file)
+        self.calib_data = self.load_calib_data(index, self.cali_file)
         velo_data = self.load_velo_scan(index, self.velo_file)
+
+        velo_data[:, 3] = 1
+        velo_in_camera = np.dot(self.calib_data["Tr_velo_to_cam"], velo_data.T)
+        velo_in_camera = velo_in_camera[:3].T
+        velo_in_camera = velo_in_camera[velo_in_camera[:, 2] > 0]
+        return velo_in_camera
 
     def load_calib_data(self, index, file):
         """
         loading calibration data file .txt
         :param index: lists of file's index
         :param file: calibration data file
-        :return: calibration matrix with dictionary
-                 Tranformation velo to cam/P0
+        :return: calibration matrix with dictionary ndarray (3 x n)
         """
         calib_dict = {}
         with open(file[index], "r") as f:
@@ -122,8 +160,8 @@ class KittiReader(DatasetReaderBase):
                     for a in line[1:]:
                         new_line.append(float(a))
                     calib_dict[line[0]] = new_line
-        calib_dict["Tr_velo_to_cam"] = np.reshape(np.array(calib_dict["Tr_velo_to_cam"]), (3, 4))
-        calib_dict["P0"] = np.reshape(np.array(calib_dict["P0"]), (3, 4))
+        for key in list(calib_dict.keys()):
+            calib_dict[key] = np.reshape(np.array(calib_dict[key]), (3, -1))
         return calib_dict
 
     def load_velo_scan(self, index, file):
@@ -131,6 +169,15 @@ class KittiReader(DatasetReaderBase):
         scan = np.fromfile(file[index], dtype=np.float32)
         scan = scan.reshape((-1, 4))
         return scan
+
+    def get_intrinsic(self, index, sensor_id=None):
+        """
+        :param index: lists of file's index
+        :param sensor_id: using when there is a multiple sensor
+        :return: intrinsic matrix (3 x 4)
+        """
+        intrinsic = self.calib_data["P0"].copy()[:, :3]
+        return intrinsic
 
 
 def test_kitti_reader():
@@ -143,6 +190,7 @@ def test_kitti_reader():
         image = reader.get_images(i)
         bboxes_2d = reader.get_box2d(i)
         reader.get_point_cloud(i)
+        reader.get_intrinsic(i)
 
 
 test_kitti_reader()
